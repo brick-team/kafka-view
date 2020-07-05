@@ -6,12 +6,12 @@ import java.util.Map;
 
 public class TopicPartitionVO {
 
-    private Integer leaderId;
-    private Integer id;
+    private Integer leaderId = -1;
+    private Integer id = -1;
     private Map<Integer, PartitionReplica> replicaMap = new LinkedHashMap<>();
-    private long size;
-    private long firstOffset;
-    private Integer preferredLeaderId;
+    private long size = -1;
+    private long firstOffset = -1;
+    private Integer preferredLeaderId = -1;
 
     public Integer getPreferredLeaderId() {
         return preferredLeaderId;
