@@ -1,49 +1,26 @@
 package org.huifer.kafka;
 
-import java.nio.ByteBuffer;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 import org.apache.kafka.clients.CommonClientConfigs;
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.ConsumerGroupListing;
-import org.apache.kafka.clients.admin.CreateTopicsResult;
-import org.apache.kafka.clients.admin.DeleteTopicsOptions;
-import org.apache.kafka.clients.admin.DeleteTopicsResult;
-import org.apache.kafka.clients.admin.DescribeClusterResult;
-import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
-import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.admin.*;
+import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.huifer.kafkawebui.model.BrokerVO;
-import org.huifer.kafkawebui.model.ClusterDescription;
-import org.huifer.kafkawebui.model.ConsumerGroupOffsets;
-import org.huifer.kafkawebui.model.TopicPartitionVO;
+import org.huifer.kafkawebui.model.*;
 import org.huifer.kafkawebui.model.TopicPartitionVO.PartitionReplica;
-import org.huifer.kafkawebui.model.TopicVO;
 import org.huifer.kafkawebui.serializer.Deserializers;
 import org.huifer.kafkawebui.serializer.MessageDeserializer;
+import org.huifer.kafkawebui.serializer.msg.StringMessageDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 public class KafkaTopicDemo {
 
@@ -78,9 +55,14 @@ public class KafkaTopicDemo {
         Map<String, TopicVO> topics = getTopics();
 //        deleteTopic("name");
 //        Map<String, TopicVO> topics2 = getTopics();
-        ClusterDescription clusterDescription = describeCluster();
-        List<BrokerVO> brokers = getBrokers();
-        getConsumerOffsets(List.of("name"));
+//        ClusterDescription clusterDescription = describeCluster();
+//        List<BrokerVO> brokers = getBrokers();
+//        getConsumerOffsets(List.of("name"));
+
+        Deserializers stringDeserializer = new Deserializers(new StringMessageDeserializer(), new StringMessageDeserializer());
+        List<ConsumerRecord> aaa = getMessage("aaa", 10000, stringDeserializer);
+
+
         System.out.println();
     }
 
@@ -134,14 +116,16 @@ public class KafkaTopicDemo {
     }
 
 
-    private static void getMessage(String topicName, int count, Deserializers deserializers) {
+    private static List<ConsumerRecord> getMessage(String topicName, int count, Deserializers deserializers) {
         List<PartitionInfo> partitionInfos = kafkaConsumer.partitionsFor(topicName);
         List<TopicPartition> partitions = partitionInfos.stream()
                 .map(partitionInfo -> new TopicPartition(partitionInfo.topic(),
                         partitionInfo.partition())).collect(Collectors.toList());
 
+        // 指定消费的分区
         kafkaConsumer.assign(partitions);
 
+        // key:topic value: size
         Map<TopicPartition, Long> topicPartitionLongMap = kafkaConsumer.endOffsets(partitions);
 
         for (TopicPartition partition : partitions) {
@@ -152,9 +136,12 @@ public class KafkaTopicDemo {
         int totalCount = count * partitions.size();
         Map<TopicPartition, ArrayList<ConsumerRecord<byte[], byte[]>>> rawRecords = partitions
                 .stream()
-                .collect(Collectors.toMap(p -> p, p -> new ArrayList(count)));
+                .collect(Collectors.toMap(p -> p, p -> {
+                    return new ArrayList(count);
+                }));
 
         boolean moreRecords = true;
+        // loop for records data
         while (rawRecords.size() < totalCount && moreRecords) {
             ConsumerRecords<byte[], byte[]> poll = kafkaConsumer.poll(Duration.ofMillis(300));
             moreRecords = false;
@@ -162,13 +149,12 @@ public class KafkaTopicDemo {
                 List<ConsumerRecord<byte[], byte[]>> records = poll.records(partition);
                 if (!records.isEmpty()) {
                     rawRecords.get(partition).addAll(records);
-                    Object object;
                     moreRecords = records.get(records.size() - 1).offset()
                             < topicPartitionLongMap.get(partition) - 1;
                 }
             }
         }
-        List<ConsumerRecord> collect = rawRecords.values().stream().flatMap(Collection::stream)
+        return rawRecords.values().stream().flatMap(Collection::stream)
                 .map(r -> {
                     return new ConsumerRecord(
                             r.topic(),
@@ -185,7 +171,6 @@ public class KafkaTopicDemo {
                             r.leaderEpoch()
                     );
                 }).collect(Collectors.toList());
-
     }
 
     private static String deserialize(MessageDeserializer keydeserializer, byte[] value) {

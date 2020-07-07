@@ -1,6 +1,7 @@
-package org.huifer.kafkawebui.serializer;
+package org.huifer.kafkawebui.serializer.msg;
 
 import org.apache.kafka.common.utils.ByteUtils;
+import org.huifer.kafkawebui.serializer.MessageDeserializer;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

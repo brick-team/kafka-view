@@ -12,7 +12,7 @@ public class CreateTopicParam {
      */
     private String name;
     /**
-     * partitions 编号
+     * partitions 编号, 分区数量
      * <b>default value = 0 </b>
      */
     private Integer partitionsNum = 0;
